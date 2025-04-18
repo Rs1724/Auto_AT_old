@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Auto Bid Launcher</title>
+  <script>
+    // Wait until the real page loads before injecting the script
+    window.onload = () => {
+      // Delay to ensure main site is fully loaded before script injection
+      setTimeout(() => {
+        const script = document.createElement("script");
+        script.innerHTML = `
+(() => {
+  let isRunning = true;
+  let intervalId = null;
+
+  const autoConfirmPopups = (duration = 2000, intervalTime = 100) => {
+    const startTime = Date.now();
+    const confirmInterval = setInterval(() => {
+      const popupYes = document.getElementById("popup_ok");
+      if (popupYes) popupYes.click();
+      if (Date.now() - startTime > duration) clearInterval(confirmInterval);
+    }, intervalTime);
+  };
+
+  const dashboard = document.createElement("div");
+  dashboard.innerHTML = \`
+    <div style="
+      position: fixed;
+      top: 0; left: 0;
+      width: 200px;
+      height: 100vh;
+      background: black;
+      color: gold;
+      z-index: 99999;
+      font-family: monospace;
+      padding: 10px;
+      border-right: 2px solid gold;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    ">
+      <label>Serials:<br><textarea id="serials" style="width:180px; height:80px;" placeholder="e.g. 1,2,3"></textarea></label>
+      <label>Min+: <input id="minInc" style="width:50px" value="5"/></label>
+      <label>Max+: <input id="maxInc" style="width:50px" value="10"/></label>
+      <label>Sleep(ms): <input id="sleep" style="width:60px" value="1000"/></label>
+      <button id="stopBtn" style="background: red; color: white;">⏹ Stop</button>
+      <span id="log" style="margin-top:auto;">Status: Running</span>
+    </div>
+  \`;
+  document.body.appendChild(dashboard);
+
+  const log = (msg) => {
+    console.log(msg);
+    const logElem = document.getElementById("log");
+    if (logElem) logElem.innerText = "Status: " + msg;
+  };
+
+  const getVal = id => document.getElementById(id).value.trim();
+  const getSerials = () => {
+    return getVal("serials").split(",").map(s => parseInt(s.trim())).filter(s => !isNaN(s));
+  };
+
+  intervalId = setInterval(() => {
+    const serials = getSerials();
+    const minInc = parseInt(getVal("minInc"));
+    const maxInc = parseInt(getVal("maxInc"));
+    const sleep = parseInt(getVal("sleep"));
+
+    serials.forEach((serial) => {
+      try {
+        const idx = serial - 1;
+        const bidRankElem = document.querySelectorAll("span[id^='bidRank_']")[idx];
+        const currentRank = bidRankElem ? bidRankElem.innerText.trim() : "";
+        if (currentRank && (currentRank.toUpperCase() === "H1" || parseInt(currentRank) === 1)) {
+          log(\`Skipping serial \${serial} because rank is \${currentRank}\`);
+          return;
+        }
+
+        const netBidElem = document.querySelectorAll("span[id^='netBidAmt_']")[idx];
+        if (!netBidElem) {
+          log(\`No netBidAmt element for serial \${serial}\`);
+          return;
+        }
+
+        let nxtVal = netBidElem.innerText.replace(/,/g, "").trim();
+        const baseBid = parseFloat(nxtVal.split(" ")[0]);
+        if (isNaN(baseBid)) {
+          log(\`Invalid base bid for serial \${serial}: \${nxtVal}\`);
+          return;
+        }
+
+        const randomInc = Math.floor(Math.random() * (maxInc - minInc + 1)) + minInc;
+        const newBid = baseBid + randomInc;
+        log(\`Serial \${serial}: baseBid=\${baseBid}, inc=\${randomInc}, newBid=\${newBid}\`);
+
+        const inputElem = document.querySelector(\`input[id^='txtcell_\${serial}_']\`);
+        if (inputElem) {
+          inputElem.value = newBid;
+          inputElem.dispatchEvent(new Event("input", { bubbles: true }));
+          inputElem.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+
+        const bidBtn = document.getElementById(\`bid_\${serial}\`);
+        if (bidBtn) {
+          if (typeof submitItemWiseBid === "function") {
+            submitItemWiseBid(serial, bidBtn);
+          } else {
+            bidBtn.click();
+          }
+          autoConfirmPopups(2000, 100);
+        }
+      } catch (e) {
+        log(\`Error on serial \${serial}: \${e}\`);
+      }
+    });
+  }, 1000);
+
+  document.getElementById("stopBtn").onclick = () => {
+    if (intervalId) clearInterval(intervalId);
+    intervalId = null;
+    isRunning = false;
+    log("Stopped.");
+  };
+
+})();
+        `;
+        document.body.appendChild(script);
+      }, 3000); // Delay before injection
+    };
+  </script>
+
+  <meta http-equiv="refresh" content="0;url=https://jewel-auction.procureitger.com">
+</head>
+<body>
+  <p>Redirecting to the auction site...</p>
+</body>
+</html>
